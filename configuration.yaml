@@ -13,8 +13,8 @@ zone:
     icon: mdi:home
 
 homeassistant:
-  external_url: "https://nk-net.chetverikov.pro"
-  internal_url: "http://192.168.1.10:8123"
+  external_url: !secret external_url
+  internal_url: !secret internal_url
 
 http:
   use_x_forwarded_for: true
