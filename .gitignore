@@ -1,0 +1,17 @@
+# Home Assistant stuff to ignore
+home-assistant.log
+home-assistant.log.*
+secrets.yaml
+*.db
+*.db-shm
+*.db-wal
+
+# Internal folders
+.storage/
+custom_components/
+__pycache__/
+deps/
+
+# Optional:
+*.tar
+*.zip

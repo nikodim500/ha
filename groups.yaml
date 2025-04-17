@@ -1,0 +1,7 @@
+residents:
+  name: "Residents"
+  entities:
+    - person.d
+    - person.katya
+    - person.nikodim
+    - person.anya

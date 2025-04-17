@@ -1,0 +1,88 @@
+- alias: 'Alarm: Motion Trigger'
+  id: alarm_motion_trigger
+  mode: restart
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.pir_sensor_porch
+      to: 'on'
+  condition:
+    - condition: state
+      entity_id: input_boolean.alarm_toggle
+      state: 'on'
+  action:
+    - event: alarm_triggered
+      event_data:
+        name: "{{ state_attr(trigger.entity_id, 'friendly_name') or trigger.entity_id }}"
+        area: "{{ area_name(trigger.entity_id) or 'Unknown' }}"
+    - delay:
+        milliseconds: 100
+    - choose:
+        # If alarm is off, turn it on and start/reset the timer
+        - conditions:
+            - condition: state
+              entity_id: input_boolean.alarm_level
+              state: 'off'
+          sequence:
+            - service: input_boolean.turn_on
+              target:
+                entity_id: input_boolean.alarm_level
+            - service: timer.start
+              data:
+                entity_id: timer.alarm_reset
+                duration: "{{ states('input_number.alarm_reset_delay') | int }}"
+        # If alarm is already on, just reset the timer
+        - conditions:
+            - condition: state
+              entity_id: input_boolean.alarm_level
+              state: 'on'
+          sequence:
+            - service: timer.start
+              data:
+                entity_id: timer.alarm_reset
+                duration: "{{ states('input_number.alarm_reset_delay') | int }}"
+
+- alias: 'Alarm: Telegram Alert'
+  id: alarm_telegram_alert
+  mode: queued
+  trigger:
+    - platform: event
+      event_type: alarm_triggered
+  action:
+    - service: telegram_bot.send_message
+      metadata: {}
+      data:
+        title: "*ALARM* (SALE)"
+        message: >
+          Motion detected in area {{ trigger.event.data.area }} ({{ trigger.event.data.name }})
+
+- alias: 'Alarm: Auto Reset'
+  id: alarm_auto_reset
+  mode: single
+  trigger:
+    - platform: event
+      event_type: timer.finished
+      event_data:
+        entity_id: timer.alarm_reset
+  condition:
+    - condition: state
+      entity_id: input_boolean.alarm_level
+      state: 'on'
+  action:
+    - service: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.alarm_level
+
+- alias: 'Alarm: Toggle Off Reset'
+  id: alarm_toggle_off_reset
+  mode: single
+  trigger:
+    - platform: state
+      entity_id: input_boolean.alarm_toggle
+      to: 'off'
+  action:
+    - service: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.alarm_level
+    - service: timer.cancel
+      target:
+        entity_id: timer.alarm_reset

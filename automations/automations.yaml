@@ -1,0 +1,82 @@
+- id: '1743004587794'
+  alias: sunset_light_on
+  description: ''
+  triggers:
+  - trigger: sun
+    event: sunset
+    offset: 00:15:00
+  conditions: []
+  actions:
+  - type: turn_on
+    device_id: ba93c82f4e4bc3945de1addd27bc91fc
+    entity_id: 00744d74a8832ce2e0b378b7c7dfb7cb
+    domain: switch
+  mode: single
+- id: '1743018659299'
+  alias: HA_start
+  description: ''
+  triggers:
+  - trigger: homeassistant
+    event: start
+  conditions: []
+  actions:
+  - action: telegram_bot.send_message
+    metadata: {}
+    data:
+      message: HA has been started
+      title: "*INFO* (SALE)"
+  mode: single
+- id: '1743020290197'
+  alias: printer_office_cartridge_low
+  description: ''
+  triggers:
+  - type: value
+    device_id: 71fb6f3b0b913c2a17ac5b4a0f7e76a8
+    entity_id: 67083b118c16c903c1bda687619b32c7
+    domain: sensor
+    trigger: device
+    below: 5
+  - type: value
+    device_id: 71fb6f3b0b913c2a17ac5b4a0f7e76a8
+    entity_id: 8bfbcf2f002b92165408de491e583a96
+    domain: sensor
+    trigger: device
+    below: 5
+  - type: value
+    device_id: 71fb6f3b0b913c2a17ac5b4a0f7e76a8
+    entity_id: 8fb8fb024a12ae0df21171efe6a87398
+    domain: sensor
+    trigger: device
+    below: 5
+  conditions: []
+  actions:
+  - action: telegram_bot.send_message
+    metadata: {}
+    data:
+      message: '{{ trigger.entity.friendly_name }} level is below 5%'
+      title: "*ALERT* (SALE)"
+  mode: single
+- id: '1743257316932'
+  alias: geo_d_left_school
+  description: ''
+  use_blueprint:
+    path: homeassistant/notify_leaving_zone.yaml
+    input:
+      person_entity: person.d
+      zone_entity: zone.sale_high_school
+      notify_device: 44404b635daf7ed8a1ef67dd59f1debf
+- id: '1743257703972'
+  alias: geo_nikodim_left_work
+  description: ''
+  triggers:
+  - trigger: zone
+    entity_id: person.nikodim
+    zone: zone.work
+    event: leave
+  conditions: []
+  actions:
+  - action: telegram_bot.send_message
+    metadata: {}
+    data:
+      message: Elvis left the building
+  mode: single

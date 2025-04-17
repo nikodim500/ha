@@ -1,0 +1,3 @@
+alarm_handler:
+  module: alarm_handler
+  class: AlarmHandler

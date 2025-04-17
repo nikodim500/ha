@@ -1,0 +1,31 @@
+- id: "1743257581580"
+  alias: geo_nikodim_enter_home
+  description: ""
+  triggers:
+    - trigger: zone
+      entity_id: person.nikodim
+      zone: zone.home
+      event: enter
+  conditions: []
+  actions:
+    - action: telegram_bot.send_message
+      metadata: {}
+      data:
+        message: Будулай вернулся
+  mode: single
+
+- id: geo_d_left_school
+  alias: D left school
+  description: Sends notification when D leaves Sale High School
+  trigger:
+    - trigger: state
+      entity_id: person.d
+      from: zone.sale_high_school
+      to: not_home
+  condition: []
+  actions:
+    - action: telegram_bot.send_message
+      metadata: {}
+      data:
+        message: "D has left Sale High School."
+  mode: single

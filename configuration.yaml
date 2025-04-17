@@ -1,0 +1,78 @@
+# Loads default set of integrations. Do not remove.
+default_config:
+
+# Load frontend themes from the themes folder
+frontend:
+  themes: !include_dir_merge_named themes
+
+zone:
+  - name: Home
+    latitude: 53.42736637035087
+    longitude: -2.321922283115781
+    radius: 60
+    icon: mdi:home
+
+homeassistant:
+  external_url: "https://nk-net.chetverikov.pro"
+  internal_url: "http://192.168.1.10:8123"
+
+http:
+  use_x_forwarded_for: true
+  trusted_proxies:
+    - 192.168.1.10
+    - 127.0.0.1
+    - 172.16.0.0/12
+    - 192.168.0.0/16
+
+#automation: !include automations.yaml
+automation: !include_dir_merge_list automations
+script: !include scripts.yaml
+scene: !include scenes.yaml
+group: !include groups.yaml
+
+telegram_bot:
+  - platform: polling
+    api_key: !secret sarah_telegram_api_key
+    allowed_chat_ids:
+      - !secret papa_chat_id
+
+notify:
+  - platform: telegram
+    name: SARAH
+    chat_id: !secret papa_chat_id
+
+mqtt:
+  binary_sensor:
+    - name: "PIR Sensor Porch"
+      unique_id: pir_sensor_porch
+      state_topic: "homeassistant/sonoff-rf-bridge/RESULT"
+      value_template: >
+        {% if value_json.RfReceived.Data == 'D2045E' %}
+          ON
+        {% else %}
+          OFF
+        {% endif %}
+      device_class: motion
+      off_delay: 10
+
+input_boolean:
+  alarm_toggle:           # On/off alarm mode
+    name: Alarm Mode
+    icon: mdi:shield-lock
+
+  alarm_level:            # Indicator of alarm triggered
+    name: Alarm Triggered
+    icon: mdi:alarm-light
+
+input_number:      
+  alarm_reset_delay:      # Period of alarm reset if no motion detected
+    name: Alarm Reset Delay
+    min: 5
+    max: 600
+    step: 5
+    unit_of_measurement: seconds
+
+timer:
+  alarm_reset:
+    name: Alarm Reset
+    duration: '00:01:00'  # default. will be changed via input_number    
