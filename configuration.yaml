@@ -13,6 +13,7 @@ zone:
     icon: mdi:home
 
 homeassistant:
+  unit_system: metric
   external_url: !secret external_url
   internal_url: !secret internal_url
 
@@ -56,16 +57,16 @@ mqtt:
       off_delay: 10
 
 input_boolean:
-  alarm_toggle:           # On/off alarm mode
+  alarm_toggle: # On/off alarm mode
     name: Alarm Mode
     icon: mdi:shield-lock
 
-  alarm_level:            # Indicator of alarm triggered
+  alarm_level: # Indicator of alarm triggered
     name: Alarm Triggered
     icon: mdi:alarm-light
 
-input_number:      
-  alarm_reset_delay:      # Period of alarm reset if no motion detected
+input_number:
+  alarm_reset_delay: # Period of alarm reset if no motion detected
     name: Alarm Reset Delay
     min: 5
     max: 600
@@ -75,4 +76,4 @@ input_number:
 timer:
   alarm_reset:
     name: Alarm Reset
-    duration: '00:01:00'  # default. will be changed via input_number    
+    duration: "00:01:00" # default. will be changed via input_number

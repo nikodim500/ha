@@ -15,3 +15,4 @@ deps/
 # Optional:
 *.tar
 *.zip
+*.sh
