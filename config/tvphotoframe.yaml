@@ -1,0 +1,89 @@
+# config/tvphotoframe.yaml
+# TV фоторамка - только UI элементы (логика в AppDaemon)
+
+# Input Boolean для управления фоторамкой
+input_boolean:
+  tvphotoframe_enabled:
+    name: "Включить фоторамку"
+    initial: true
+    icon: mdi:image-multiple
+
+  tvphotoframe_active:
+    name: "Фоторамка активна"
+    initial: false
+    icon: mdi:play-circle
+
+# Input Number для настройки интервалов
+input_number:
+  tvphotoframe_interval:
+    name: "Интервал фоторамки (секунды)"
+    min: 1
+    max: 60
+    step: 1
+    initial: 5
+    unit_of_measurement: "сек"
+    icon: mdi:timer
+
+  tv_inactive_timeout:
+    name: "Таймаут неактивности TV (минуты)"
+    min: 5
+    max: 120
+    step: 5
+    initial: 30
+    unit_of_measurement: "мин"
+    icon: mdi:clock-outline
+
+# Input Text для пути к папке с фото
+input_text:
+  tvphotoframe_folder:
+    name: "Папка с фотографиями"
+    initial: "/media/nas/photos/"
+    max: 255
+
+# Template sensor для отслеживания активности TV
+template:
+  - sensor:
+      - name: "LG TV Activity Status"
+        unique_id: lg_tv_activity_status
+        state: >
+          {%- set tv_entity = 'media_player.lg_webos_tv_ur80006lj_2' -%}
+          {%- if states(tv_entity) in ['on', 'playing', 'paused', 'idle'] -%}
+            {%- if states(tv_entity) == 'playing' -%}
+              active
+            {%- elif states(tv_entity) in ['paused', 'idle'] -%}
+              {%- if state_attr(tv_entity, 'media_title') -%}
+                active
+              {%- else -%}
+                idle
+              {%- endif -%}
+            {%- else -%}
+              idle
+            {%- endif -%}
+          {%- else -%}
+            off
+          {%- endif -%}
+        attributes:
+          tv_entity: "media_player.lg_webos_tv_ur80006lj_2"
+          tv_state: "{{ states('media_player.lg_webos_tv_ur80006lj_2') }}"
+          media_title: "{{ state_attr('media_player.lg_webos_tv_ur80006lj_2', 'media_title') }}"
+          source: "{{ state_attr('media_player.lg_webos_tv_ur80006lj_2', 'source') }}"
+
+# Скрипты для ручного управления через UI
+script:
+  start_tvphotoframe:
+    alias: "Запуск фоторамки"
+    sequence:
+      - service: input_boolean.turn_on
+        entity_id: input_boolean.tvphotoframe_active
+
+  stop_tvphotoframe:
+    alias: "Остановка фоторамки"
+    sequence:
+      - service: input_boolean.turn_off
+        entity_id: input_boolean.tvphotoframe_active
+
+  toggle_tvphotoframe:
+    alias: "Переключить фоторамку"
+    sequence:
+      - service: input_boolean.toggle
+        entity_id: input_boolean.tvphotoframe_active

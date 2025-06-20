@@ -3,6 +3,7 @@ appdaemon:
   latitude: 0
   longitude: 0
   elevation: 0
+  app_dir: /config/apps
 
 http:
   url: "http://127.0.0.1:5050"
