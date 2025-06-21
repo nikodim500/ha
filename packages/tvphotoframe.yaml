@@ -1,5 +1,5 @@
 # config/packages/tvphotoframe.yaml
-# TV Photo Frame on pure Home Assistant
+# TV Photo Frame with file-based photo storage
 
 # Input Boolean for photo frame control
 input_boolean:
@@ -12,6 +12,11 @@ input_boolean:
     name: "Photo Frame Active"
     initial: false
     icon: mdi:play-circle
+
+  tvphotoframe_scanning:
+    name: "Photo Scanning in Progress"
+    initial: false
+    icon: mdi:folder-search
 
 # Input Number for interval settings
 input_number:
@@ -33,14 +38,6 @@ input_number:
     unit_of_measurement: "min"
     icon: mdi:clock-outline
 
-  tvphotoframe_current_photo:
-    name: "Current Photo (number)"
-    min: 0
-    max: 1000
-    step: 1
-    initial: 0
-    mode: box
-
   tvphotoframe_total_photos:
     name: "Total Photo Count"
     min: 0
@@ -54,20 +51,8 @@ input_number:
 input_text:
   tvphotoframe_folder:
     name: "Photo Folder Path"
-    initial: "\\\\192.168.1.11\\photo\\0001photoframe"
+    initial: "/media/photo/0001photoframe"
     max: 255
-
-  tvphotoframe_current_path:
-    name: "Current Photo Path"
-    max: 500
-
-# Input Select for photo list (filled automatically)
-input_select:
-  tvphotoframe_photos:
-    name: "Photo List"
-    options:
-      - "Loading..."
-    initial: "Loading..."
 
 # Template sensor for TV activity tracking
 template:
@@ -97,37 +82,6 @@ template:
           media_title: "{{ state_attr('media_player.lg_webos_tv_ur80006lj_2', 'media_title') }}"
           source: "{{ state_attr('media_player.lg_webos_tv_ur80006lj_2', 'source') }}"
 
-      # Sensor for random photo (optimized for hundreds of photos)
-      - name: "Random Photo Path"
-        unique_id: random_photo_path
-        state: >
-          {%- set photos = state_attr('input_select.tvphotoframe_photos', 'options') -%}
-          {%- if photos and photos != ['Loading...'] and photos[0] != 'No photos found - check path' -%}
-            {%- set folder = states('input_text.tvphotoframe_folder') -%}
-            {%- set current_num = states('input_number.tvphotoframe_current_photo') | int -%}
-            {%- set photo = photos[current_num % (photos | length)] -%}
-            {%- if '/' in photo -%}
-              {{ folder }}\\{{ photo.replace('/', '\\') }}
-            {%- else -%}
-              {{ folder }}\\{{ photo }}
-            {%- endif -%}
-          {%- else -%}
-            unavailable
-          {%- endif -%}
-        attributes:
-          folder: "{{ states('input_text.tvphotoframe_folder') }}"
-          total_photos: "{{ states('input_number.tvphotoframe_total_photos') | int }}"
-          available_photos: "{{ state_attr('input_select.tvphotoframe_photos', 'options') | length }}"
-          current_number: "{{ states('input_number.tvphotoframe_current_photo') }}"
-          current_file: >
-            {%- set photos = state_attr('input_select.tvphotoframe_photos', 'options') -%}
-            {%- if photos and photos != ['Loading...'] -%}
-              {%- set current_num = states('input_number.tvphotoframe_current_photo') | int -%}
-              {{ photos[current_num % (photos | length)] }}
-            {%- else -%}
-              none
-            {%- endif -%}
-
 # Automations
 automation:
   # Start photo frame on TV inactivity
@@ -147,7 +101,7 @@ automation:
         entity_id: input_boolean.tvphotoframe_active
         state: "off"
       - condition: template
-        value_template: "{{ states('input_select.tvphotoframe_photos') != 'Loading...' }}"
+        value_template: "{{ states('input_number.tvphotoframe_total_photos') | int > 0 }}"
     action:
       - service: input_boolean.turn_on
         entity_id: input_boolean.tvphotoframe_active
@@ -196,12 +150,8 @@ automation:
       - condition: template
         value_template: "{{ states('sensor.random_photo_path') != 'unavailable' }}"
     action:
-      # Increase photo number (random)
-      - service: input_number.set_value
-        target:
-          entity_id: input_number.tvphotoframe_current_photo
-        data:
-          value: "{{ range(0, state_attr('input_select.tvphotoframe_photos', 'options') | length) | random }}"
+      # Get next random photo from Python script
+      - service: shell_command.get_next_photo
 
       # Show photo on TV
       - service: media_player.play_media
@@ -214,7 +164,7 @@ automation:
       # Notification
       - service: notify.persistent_notification
         data:
-          message: "Showing photo: {{ state_attr('sensor.random_photo_path', 'current_number') }}/{{ state_attr('sensor.random_photo_path', 'total_photos') }}"
+          message: "Showing photo: {{ state_attr('sensor.random_photo_path', 'photo_file') }}"
           title: "TV Photo Frame"
 
       # Schedule next photo
@@ -229,79 +179,23 @@ automation:
         event_data:
           entity_id: automation.tvphotoframe_show_next_photo
 
-  # Load photo list from folder (improved version)
-  - id: tvphotoframe_load_photos
-    alias: "Load Photo List"
-    trigger:
-      - platform: homeassistant
-        event: start
-      - platform: state
-        entity_id: input_text.tvphotoframe_folder
-    action:
-      # Reset to loading state
-      - service: input_select.set_options
-        target:
-          entity_id: input_select.tvphotoframe_photos
-        data:
-          options:
-            - "Loading photos..."
-
-      # Here Python script should run
-      # For manual mode - add your photos:
-      - service: input_select.set_options
-        target:
-          entity_id: input_select.tvphotoframe_photos
-        data:
-          options: >
-            {%- set folder = states('input_text.tvphotoframe_folder') -%}
-            {%- if 'test' in folder.lower() -%}
-              [
-                "test1.jpg", "test2.png", "test3.jpeg",
-                "family/vacation1.jpg", "family/vacation2.png",
-                "pets/dog1.jpg", "pets/cat1.jpeg"
-              ]
-            {%- else -%}
-              [
-                "photo001.jpg", "photo002.jpg", "photo003.png",
-                "IMG_001.jpg", "IMG_002.jpg", "DSC001.jpg",
-                "nature/sunset.jpg", "nature/forest.png",
-                "family/birthday.jpg", "family/wedding.jpg"
-              ]
-            {%- endif -%}
-
-      # Update counter
-      - service: input_number.set_value
-        target:
-          entity_id: input_number.tvphotoframe_total_photos
-        data:
-          value: "{{ state_attr('input_select.tvphotoframe_photos', 'options') | length }}"
-
-      - service: notify.persistent_notification
-        data:
-          message: "📷 Loaded {{ state_attr('input_select.tvphotoframe_photos', 'options') | length }} photos from folder"
-          title: "TV Photo Frame"
-
-  # Python script for photo loading (reads path from UI)
+  # Python script for photo loading
   - id: tvphotoframe_run_python_scanner
     alias: "Run Python Photo Scanner"
     trigger:
       - platform: homeassistant
         event: start
-        for:
-          minutes: 2 # Wait 2 minutes after HA start
       - platform: event
         event_type: tvphotoframe_scan_photos
       - platform: state
         entity_id: input_text.tvphotoframe_folder
-        for:
-          seconds: 2 # Small delay after path change
     action:
+      - delay:
+          seconds: 30
       - service: notify.persistent_notification
         data:
           message: "🐍 Running photo scan from folder: {{ states('input_text.tvphotoframe_folder') }}"
           title: "TV Photo Frame"
-
-      # Run Python script (it will read path from HA itself)
       - service: shell_command.scan_photos
 
 # Scripts for manual control
@@ -330,5 +224,23 @@ script:
       - condition: state
         entity_id: input_boolean.tvphotoframe_active
         state: "on"
-      - service: automation.trigger
-        entity_id: automation.tvphotoframe_show_next_photo
+      - service: shell_command.get_next_photo
+
+  manual_photo_scan:
+    alias: "Manual Photo Scan"
+    sequence:
+      - service: input_boolean.turn_on
+        entity_id: input_boolean.tvphotoframe_scanning
+      - service: notify.persistent_notification
+        data:
+          message: "🐍 Starting photo scan..."
+          title: "TV Photo Frame"
+      - service: shell_command.scan_photos
+      - delay:
+          seconds: 5
+      - service: input_boolean.turn_off
+        entity_id: input_boolean.tvphotoframe_scanning
+      - service: notify.persistent_notification
+        data:
+          message: "✅ Photo scan completed! Check sensor status."
+          title: "TV Photo Frame"

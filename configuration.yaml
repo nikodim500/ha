@@ -20,7 +20,8 @@ homeassistant:
 
 shell_command:
   scan_photos: "python3 /config/scripts/load_photos.py"
-    
+  get_next_photo: "python3 /config/scripts/get_next_photo.py"
+
 http:
   use_x_forwarded_for: true
   trusted_proxies:
@@ -81,3 +82,5 @@ timer:
   alarm_reset:
     name: Alarm Reset
     duration: "00:01:00" # default. will be changed via input_number
+
+browser_mod:

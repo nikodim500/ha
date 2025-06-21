@@ -1,0 +1,8 @@
+test_browser_mod_toast:
+  alias: Test browser_mod.toast
+  sequence:
+  - data:
+      message: "\U0001F680 browser_mod доступен!"
+    action: browser_mod.toast
+  mode: single
+  description: ''

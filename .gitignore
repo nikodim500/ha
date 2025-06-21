@@ -12,7 +12,14 @@ custom_components/
 __pycache__/
 deps/
 
+www/
+www/photo/
+
 # Optional:
 *.tar
 *.zip
 *.sh
+*.log
+*.gz
+*js
+*.txt
