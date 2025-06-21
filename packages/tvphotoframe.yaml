@@ -1,0 +1,334 @@
+# config/packages/tvphotoframe.yaml
+# TV Photo Frame on pure Home Assistant
+
+# Input Boolean for photo frame control
+input_boolean:
+  tvphotoframe_enabled:
+    name: "Enable Photo Frame"
+    initial: true
+    icon: mdi:image-multiple
+
+  tvphotoframe_active:
+    name: "Photo Frame Active"
+    initial: false
+    icon: mdi:play-circle
+
+# Input Number for interval settings
+input_number:
+  tvphotoframe_interval:
+    name: "Photo Frame Interval (seconds)"
+    min: 1
+    max: 60
+    step: 1
+    initial: 5
+    unit_of_measurement: "sec"
+    icon: mdi:timer
+
+  tv_inactive_timeout:
+    name: "TV Inactive Timeout (minutes)"
+    min: 1
+    max: 30
+    step: 1
+    initial: 15
+    unit_of_measurement: "min"
+    icon: mdi:clock-outline
+
+  tvphotoframe_current_photo:
+    name: "Current Photo (number)"
+    min: 0
+    max: 1000
+    step: 1
+    initial: 0
+    mode: box
+
+  tvphotoframe_total_photos:
+    name: "Total Photo Count"
+    min: 0
+    max: 10000
+    step: 1
+    initial: 0
+    mode: box
+    icon: mdi:counter
+
+# Input Text for settings
+input_text:
+  tvphotoframe_folder:
+    name: "Photo Folder Path"
+    initial: "\\\\192.168.1.11\\photo\\0001photoframe"
+    max: 255
+
+  tvphotoframe_current_path:
+    name: "Current Photo Path"
+    max: 500
+
+# Input Select for photo list (filled automatically)
+input_select:
+  tvphotoframe_photos:
+    name: "Photo List"
+    options:
+      - "Loading..."
+    initial: "Loading..."
+
+# Template sensor for TV activity tracking
+template:
+  - sensor:
+      - name: "LG TV Activity Status"
+        unique_id: lg_tv_activity_status
+        state: >
+          {%- set tv_entity = 'media_player.lg_webos_tv_ur80006lj_2' -%}
+          {%- if states(tv_entity) in ['on', 'playing', 'paused', 'idle'] -%}
+            {%- if states(tv_entity) == 'playing' -%}
+              active
+            {%- elif states(tv_entity) in ['paused', 'idle'] -%}
+              {%- if state_attr(tv_entity, 'media_title') -%}
+                active
+              {%- else -%}
+                idle
+              {%- endif -%}
+            {%- else -%}
+              idle
+            {%- endif -%}
+          {%- else -%}
+            off
+          {%- endif -%}
+        attributes:
+          tv_entity: "media_player.lg_webos_tv_ur80006lj_2"
+          tv_state: "{{ states('media_player.lg_webos_tv_ur80006lj_2') }}"
+          media_title: "{{ state_attr('media_player.lg_webos_tv_ur80006lj_2', 'media_title') }}"
+          source: "{{ state_attr('media_player.lg_webos_tv_ur80006lj_2', 'source') }}"
+
+      # Sensor for random photo (optimized for hundreds of photos)
+      - name: "Random Photo Path"
+        unique_id: random_photo_path
+        state: >
+          {%- set photos = state_attr('input_select.tvphotoframe_photos', 'options') -%}
+          {%- if photos and photos != ['Loading...'] and photos[0] != 'No photos found - check path' -%}
+            {%- set folder = states('input_text.tvphotoframe_folder') -%}
+            {%- set current_num = states('input_number.tvphotoframe_current_photo') | int -%}
+            {%- set photo = photos[current_num % (photos | length)] -%}
+            {%- if '/' in photo -%}
+              {{ folder }}\\{{ photo.replace('/', '\\') }}
+            {%- else -%}
+              {{ folder }}\\{{ photo }}
+            {%- endif -%}
+          {%- else -%}
+            unavailable
+          {%- endif -%}
+        attributes:
+          folder: "{{ states('input_text.tvphotoframe_folder') }}"
+          total_photos: "{{ states('input_number.tvphotoframe_total_photos') | int }}"
+          available_photos: "{{ state_attr('input_select.tvphotoframe_photos', 'options') | length }}"
+          current_number: "{{ states('input_number.tvphotoframe_current_photo') }}"
+          current_file: >
+            {%- set photos = state_attr('input_select.tvphotoframe_photos', 'options') -%}
+            {%- if photos and photos != ['Loading...'] -%}
+              {%- set current_num = states('input_number.tvphotoframe_current_photo') | int -%}
+              {{ photos[current_num % (photos | length)] }}
+            {%- else -%}
+              none
+            {%- endif -%}
+
+# Automations
+automation:
+  # Start photo frame on TV inactivity
+  - id: start_tvphotoframe_on_tv_inactive
+    alias: "Start Photo Frame on TV Inactive"
+    trigger:
+      - platform: state
+        entity_id: sensor.lg_tv_activity_status
+        to: "idle"
+        for:
+          minutes: "{{ states('input_number.tv_inactive_timeout') | int }}"
+    condition:
+      - condition: state
+        entity_id: input_boolean.tvphotoframe_enabled
+        state: "on"
+      - condition: state
+        entity_id: input_boolean.tvphotoframe_active
+        state: "off"
+      - condition: template
+        value_template: "{{ states('input_select.tvphotoframe_photos') != 'Loading...' }}"
+    action:
+      - service: input_boolean.turn_on
+        entity_id: input_boolean.tvphotoframe_active
+      - service: automation.trigger
+        entity_id: automation.tvphotoframe_show_next_photo
+
+  # Stop photo frame on TV activity
+  - id: stop_tvphotoframe_on_tv_active
+    alias: "Stop Photo Frame on TV Active"
+    trigger:
+      - platform: state
+        entity_id: sensor.lg_tv_activity_status
+        to: "active"
+      - platform: state
+        entity_id: media_player.lg_webos_tv_ur80006lj_2
+        attribute: source
+      - platform: state
+        entity_id: media_player.lg_webos_tv_ur80006lj_2
+        attribute: volume_level
+    condition:
+      - condition: state
+        entity_id: input_boolean.tvphotoframe_active
+        state: "on"
+    action:
+      - service: input_boolean.turn_off
+        entity_id: input_boolean.tvphotoframe_active
+      - service: media_player.media_stop
+        target:
+          entity_id: media_player.lg_webos_tv_ur80006lj_2
+
+  # Show next photo (main loop)
+  - id: tvphotoframe_show_next_photo
+    alias: "Show Next Photo"
+    trigger:
+      - platform: state
+        entity_id: input_boolean.tvphotoframe_active
+        to: "on"
+      - platform: event
+        event_type: automation.triggered
+        event_data:
+          entity_id: automation.tvphotoframe_show_next_photo
+    condition:
+      - condition: state
+        entity_id: input_boolean.tvphotoframe_active
+        state: "on"
+      - condition: template
+        value_template: "{{ states('sensor.random_photo_path') != 'unavailable' }}"
+    action:
+      # Increase photo number (random)
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.tvphotoframe_current_photo
+        data:
+          value: "{{ range(0, state_attr('input_select.tvphotoframe_photos', 'options') | length) | random }}"
+
+      # Show photo on TV
+      - service: media_player.play_media
+        target:
+          entity_id: media_player.lg_webos_tv_ur80006lj_2
+        data:
+          media_content_type: "image/jpeg"
+          media_content_id: "{{ states('sensor.random_photo_path') }}"
+
+      # Notification
+      - service: notify.persistent_notification
+        data:
+          message: "Showing photo: {{ state_attr('sensor.random_photo_path', 'current_number') }}/{{ state_attr('sensor.random_photo_path', 'total_photos') }}"
+          title: "TV Photo Frame"
+
+      # Schedule next photo
+      - delay:
+          seconds: "{{ states('input_number.tvphotoframe_interval') | int }}"
+
+      # Start next cycle (if photo frame still active)
+      - condition: state
+        entity_id: input_boolean.tvphotoframe_active
+        state: "on"
+      - event: automation.triggered
+        event_data:
+          entity_id: automation.tvphotoframe_show_next_photo
+
+  # Load photo list from folder (improved version)
+  - id: tvphotoframe_load_photos
+    alias: "Load Photo List"
+    trigger:
+      - platform: homeassistant
+        event: start
+      - platform: state
+        entity_id: input_text.tvphotoframe_folder
+    action:
+      # Reset to loading state
+      - service: input_select.set_options
+        target:
+          entity_id: input_select.tvphotoframe_photos
+        data:
+          options:
+            - "Loading photos..."
+
+      # Here Python script should run
+      # For manual mode - add your photos:
+      - service: input_select.set_options
+        target:
+          entity_id: input_select.tvphotoframe_photos
+        data:
+          options: >
+            {%- set folder = states('input_text.tvphotoframe_folder') -%}
+            {%- if 'test' in folder.lower() -%}
+              [
+                "test1.jpg", "test2.png", "test3.jpeg",
+                "family/vacation1.jpg", "family/vacation2.png",
+                "pets/dog1.jpg", "pets/cat1.jpeg"
+              ]
+            {%- else -%}
+              [
+                "photo001.jpg", "photo002.jpg", "photo003.png",
+                "IMG_001.jpg", "IMG_002.jpg", "DSC001.jpg",
+                "nature/sunset.jpg", "nature/forest.png",
+                "family/birthday.jpg", "family/wedding.jpg"
+              ]
+            {%- endif -%}
+
+      # Update counter
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.tvphotoframe_total_photos
+        data:
+          value: "{{ state_attr('input_select.tvphotoframe_photos', 'options') | length }}"
+
+      - service: notify.persistent_notification
+        data:
+          message: "📷 Loaded {{ state_attr('input_select.tvphotoframe_photos', 'options') | length }} photos from folder"
+          title: "TV Photo Frame"
+
+  # Python script for photo loading (reads path from UI)
+  - id: tvphotoframe_run_python_scanner
+    alias: "Run Python Photo Scanner"
+    trigger:
+      - platform: homeassistant
+        event: start
+        for:
+          minutes: 2 # Wait 2 minutes after HA start
+      - platform: event
+        event_type: tvphotoframe_scan_photos
+      - platform: state
+        entity_id: input_text.tvphotoframe_folder
+        for:
+          seconds: 2 # Small delay after path change
+    action:
+      - service: notify.persistent_notification
+        data:
+          message: "🐍 Running photo scan from folder: {{ states('input_text.tvphotoframe_folder') }}"
+          title: "TV Photo Frame"
+
+      # Run Python script (it will read path from HA itself)
+      - service: shell_command.scan_photos
+
+# Scripts for manual control
+script:
+  start_tvphotoframe:
+    alias: "Start Photo Frame"
+    sequence:
+      - service: input_boolean.turn_on
+        entity_id: input_boolean.tvphotoframe_active
+
+  stop_tvphotoframe:
+    alias: "Stop Photo Frame"
+    sequence:
+      - service: input_boolean.turn_off
+        entity_id: input_boolean.tvphotoframe_active
+
+  toggle_tvphotoframe:
+    alias: "Toggle Photo Frame"
+    sequence:
+      - service: input_boolean.toggle
+        entity_id: input_boolean.tvphotoframe_active
+
+  next_photo:
+    alias: "Next Photo"
+    sequence:
+      - condition: state
+        entity_id: input_boolean.tvphotoframe_active
+        state: "on"
+      - service: automation.trigger
+        entity_id: automation.tvphotoframe_show_next_photo

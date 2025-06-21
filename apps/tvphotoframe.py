@@ -1,5 +1,4 @@
-# apps/tvphotoframe.py
-print("🧪 TVPHOTOFRAME.PY ЗАГРУЖАЕТСЯ!")
+# apps/tvphotoframe_manager.py
 
 import appdaemon.plugins.hass.hassapi as hass
 import os
@@ -24,6 +23,9 @@ class TvPhotoFrameManager(hass.Hass):
         self.tvphotoframe_timer = None
         self.last_activity_time = datetime.now()
         
+        # Синхронизируем путь в UI с конфигурацией (если UI пустой)
+        self.sync_folder_path()
+        
         # Загрузка списка фотографий
         self.load_photo_list()
         
@@ -42,6 +44,17 @@ class TvPhotoFrameManager(hass.Hass):
         self.register_service("tvphotoframe/toggle", self.toggle_tvphotoframe_service)
         
         self.log("TvPhotoFrameManager инициализирован")
+    
+    def sync_folder_path(self):
+        """Синхронизация пути в UI с конфигурацией"""
+        ui_path = self.get_state("input_text.tvphotoframe_folder")
+        
+        # Если в UI стоит дефолтный путь или пусто - обновляем из конфигурации
+        if not ui_path or ui_path == "/media/nas/photos/" or ui_path == "unknown":
+            self.set_state("input_text.tvphotoframe_folder", state=self.photo_folder)
+            self.log(f"Обновлен путь в UI: {self.photo_folder}")
+        else:
+            self.log(f"UI путь уже установлен: {ui_path}")
     
     def load_photo_list(self):
         """Загрузка списка фотографий из папки"""

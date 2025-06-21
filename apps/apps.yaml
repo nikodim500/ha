@@ -1,7 +1,3 @@
-alarm:
-  module: alarm
-  class: AlarmHandler
-
 tvphotoframe:
   module: tvphotoframe
   class: TvPhotoFrameManager
